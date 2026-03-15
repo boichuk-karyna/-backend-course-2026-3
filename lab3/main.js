@@ -1,6 +1,5 @@
 const { Command } = require('commander');
 const fs = require('fs');
-const path = require('path');
 const program = new Command();
 
 program
@@ -10,13 +9,16 @@ program
 
 
 program
-  .requiredOption('-i, --input <file>', 'шлях до файлу для читання') 
-  .option('-o, --output <file>', 'шлях до файлу для запису результату') 
-  .option('-d, --display', 'вивести результат у консоль');             
+  .requiredOption('-i, --input <file>', 'шлях до файлу для читання')
+  .option('-o, --output <file>', 'шлях до файлу для запису результату')
+  .option('-d, --display', 'вивести результат у консоль');
+
+program
+  .option('-m, --mfo', 'Відображати код МФО перед назвою банку')
+  .option('-n, --normal', 'Відображати лише працюючі банки з кодом 1 "Нормальний"');
 
 program.parse(process.argv);
 const options = program.opts();
-
 
 if (!options.input) {
   console.error('Please, specify input file');
@@ -32,24 +34,48 @@ if (!fs.existsSync(options.input)) {
 
 let data;
 try {
-  data = fs.readFileSync(options.input, 'utf-8');
+  const fileContent = fs.readFileSync(options.input, 'utf-8');
+  data = JSON.parse(fileContent);
 } catch (err) {
   console.error('Cannot find input file');
   process.exit(1);
 }
 
-const result = data;
+
+let resultLines = [];
+
+data.forEach(item => {
+
+  if (options.normal && item.COD_STATE !== 1) return;
+
+
+  let line = '';
+  if (options.mfo) {
+    line += item.MFO + ' ';
+  }
+  line += item.SHORTNAME || item.FULLNAME || 'Unknown Bank';
+
+  resultLines.push(line);
+});
+
+
+if (resultLines.length === 0 && !options.output && !options.display) {
+  process.exit(0);
+}
+
+
+const resultText = resultLines.join('\n');
 
 
 if (options.display) {
-  console.log(result);
+  console.log(resultText);
 }
+
 
 if (options.output) {
   try {
-    fs.writeFileSync(options.output, result, 'utf-8');
+    fs.writeFileSync(options.output, resultText, 'utf-8');
   } catch (err) {
     console.error('Error writing to output file:', err.message);
   }
 }
-
